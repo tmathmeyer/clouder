@@ -52,11 +52,19 @@ getRevUrlsFromSP = function(url, cb) {
 								cloud[prop] = 0;
 							}
 							cloud[prop] += ncl[prop]
+							if (prop.indexOf("/") > -1) {
+								cloud[prop] = 0;
+							}
 						}
 					} else {
 						cloud = ncl;
 					}
 					if (sum == top) {
+						cloud.this = 0;
+						cloud.that = 0;
+						cloud.have = 0;
+						cloud.with = 0;
+						cloud.will = 0;
 						cb(cloud);
 					}
 				})
