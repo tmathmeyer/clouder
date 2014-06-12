@@ -1,100 +1,74 @@
 var request = require('request');
 var cheerio = require('cheerio');
 
-
-getHTML = function(url) {
-	var html = '';
-	request(url, function(error, response, pagesrc) {
-		if (error) {
-			html = 'err';
-			console.log(error);
-		} else {
-			html = pagesrc;
-		}
-	});
-
-	return html;
-}
-
-
-// seed:    an array of URLs
-// timeout: [optional] seconds between request
-Scraper = function(seed, timeout) {
-	this.urls = seed;
-	this.to = timeout;
-}
-
-var scraped = {};
-var prefix = "http://tedbox.dhcp.tripadvisor.com";
-
-scan = function(validate, process, url) {
-	if (!scraped[url]) {
-		scraped[url] = 1;
-
-		request(url, function(error, response, pagesrc){
-			if (error) {
-				console.log("ERR: "+url);
-				console.log(error);
+URLToCloud = function(url, cb) {
+	request(url, function(error, response, pagesrc){
+		var $ = cheerio.load(pagesrc);
+		var srcs = $('.user-generated-content').text();
+		srcs = srcs.replace(/[0-9\-\"\?\n\'\,\!\.\:\(\)]/g, '');
+		var each = srcs.split(" ");
+		var cloud = {};
+		each.forEach(function(every){
+			if (every.length < 4 || every.indexOf("http") > -1) {
+				return;
+			}
+			every = every.toLowerCase();
+			if (cloud[every]) {
+				cloud[every] = cloud[every]+1;
 			} else {
-				var $ = cheerio.load(pagesrc);
-				var parse = validate($, pagesrc, url);
-
-				$('a').each(function(i, s){
-					var branch = $(this).attr('href');
-					if (branch && branch[0] == '/') {
-						branch = prefix + branch;
-						if (parse == 2) {
-							setImmediate(function(){
-								scan(validate, process, branch);
-							});
-						}
-					}
-				});
-
-				if (parse > 0) {
-					process($, url);
-				}
+				cloud[every] = 1;
 			}
 		});
-	}
+		cb(cloud);
+	});
 }
 
-Scraper.prototype.start = function(val, proc) {
-	scan(val, proc, prefix+this.urls[0]);
-};
-
-var s = new Scraper(["/Hotel_Review-g54122-d1723668-Reviews-The_Ocean_House-Watch_Hill_Westerly_South_County_Rhode_Island.html"]);
+//URLToCloud("http://www.realself.com/review/washington-dc-rhinoplasty-natural-beauty", function(result) {
+//	console.log(result);
+//});
 
 
-isInWatchHill = function($, pagesrc, url) {
-	if (url.indexOf("g54122") > -1) {
-		return 2;
-	}
-	return 0;
+getRevUrlsFromSP = function(url, cb) {
+	request(url, function(error, response, pagesrc){
+		var $ = cheerio.load(pagesrc);
+		var cloud;
+		var srcs = $('.link-read-more');
+		var sum = 0;
+		var top = srcs.length;
+
+		top = top*(top-1)/2;
+		srcs.each(function(index, every){
+			var branch = $(this).attr('href');
+			if (branch && branch[0] == '/') {
+				var nurl = "http://www.realself.com"+branch;
+				URLToCloud(nurl, function(ncl){
+					sum += index;
+					if (cloud) {
+						for (prop in ncl) {
+							if (!ncl.hasOwnProperty(prop)) {
+								continue;
+							}
+							if (!cloud[prop]) {
+								cloud[prop] = 0;
+							}
+							cloud[prop] += ncl[prop]
+						}
+					} else {
+						cloud = ncl;
+					}
+					if (sum == top) {
+						cb(cloud);
+					}
+				})
+			}
+		});
+	});
+
 }
 
-print = function(c,u) {
-	console.log(u);
-}
 
-
-s.start(isInWatchHill, print);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+getRevUrlsFromSP("http://www.realself.com/Rhinoplasty/Nose-job/reviews", function(each){
+	console.log(each);
+});
 
 
